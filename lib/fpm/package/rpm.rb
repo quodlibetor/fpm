@@ -32,6 +32,9 @@ class FPM::Package::RPM < FPM::Package
   option "--use-file-permissions", :flag, 
       "Use existing file permissions when defining ownership and modes"
 
+  option "--rpm-literal-depends", :flag,
+      "Don't s/-/_/ in rpm versions"
+
   option "--user", "USER",
     "Set the user to USER in the %files section.", 
     :default => 'root' do |value|
@@ -55,6 +58,8 @@ class FPM::Package::RPM < FPM::Package
     :default => '-' do |value|
       value
   end
+
+  option "--rpm-literal-depends", :flag,
 
   rpmbuild_define = []
   option "--rpmbuild-define", "DEFINITION",
@@ -222,15 +227,19 @@ class FPM::Package::RPM < FPM::Package
     end
 
     # Convert any dashes in version strings to underscores.
-    self.dependencies = self.dependencies.collect do |dep|
-      name, op, version = dep.split(/\s+/)
-      if !version.nil? and version.include?("-")
-        @logger.warn("Dependency package '#{name}' version '#{version}' " \
-                     "includes dashes, converting to underscores")
-        version = version.gsub(/-/, "_")
-        "#{name} #{op} #{version}"
-      else
-        dep
+    # If the --rpm-literal-depends flag is set then trust that users know what
+    # they're doing
+    unless attributes[:rpm_literal_depends]
+      self.dependencies = self.dependencies.collect do |dep|
+        name, op, version = dep.split(/\s+/)
+        if !version.nil? and version.include?("-")
+          @logger.warn("Dependency package '#{name}' version '#{version}' " \
+                       "includes dashes, converting to underscores")
+          version = version.gsub(/-/, "_")
+          "#{name} #{op} #{version}"
+        else
+          dep
+        end
       end
     end
 
